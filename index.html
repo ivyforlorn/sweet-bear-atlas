@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#FAF4E7" />
+  <title>松松熊甜品地图 · Sweet Bear Atlas</title>
+  <meta name="description" content="一张软乎乎的甜品地图。搜索、筛选、逛逛世界各地的甜品店，找到下一份让你开心的小甜点。" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='16' cy='17' r='10' fill='%23C99A6B' stroke='%237C5A3D' stroke-width='3'/%3E%3Ccircle cx='48' cy='17' r='10' fill='%23C99A6B' stroke='%237C5A3D' stroke-width='3'/%3E%3Ccircle cx='32' cy='34' r='23' fill='%23D2A677' stroke='%237C5A3D' stroke-width='3'/%3E%3Cellipse cx='32' cy='41' rx='13' ry='10' fill='%23FBF0DD'/%3E%3Ccircle cx='24' cy='31' r='2.6' fill='%236E4E33'/%3E%3Ccircle cx='40' cy='31' r='2.6' fill='%236E4E33'/%3E%3Cellipse cx='32' cy='38' rx='3.4' ry='2.6' fill='%236E4E33'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="paper-grain" aria-hidden="true"></div>
+
+  <header class="app-header">
+    <button class="brand" id="brandHome" type="button" aria-label="回到松松熊甜品地图首页">
+      <span class="brand-mark" aria-hidden="true">
+        <img src="assets/brown-face.png" alt="" class="bear-logo" />
+      </span>
+      <span class="brand-text">
+        <strong>松松熊甜品地图</strong>
+        <small>SWEET BEAR ATLAS</small>
+      </span>
+    </button>
+
+    <div class="header-actions">
+      <button class="header-pill" id="favoritesToggle" type="button" aria-pressed="false" title="只看我收藏的甜品店">
+        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 20.4s-7.5-4.6-9.3-9A5.2 5.2 0 0 1 12 6.3a5.2 5.2 0 0 1 9.3 5.1c-1.8 4.4-9.3 9-9.3 9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <span>我的收藏</span>
+        <span class="fav-count" id="favCount">0</span>
+      </button>
+      <button class="header-pill data-pill" id="settingsBtn" type="button" title="Google 数据源设置">
+        <span class="live-dot" id="liveDot" hidden></span>
+        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.5-2-3.4-2.4 1a7.8 7.8 0 0 0-2.6-1.5L14 2.6h-4l-.4 2.5A7.8 7.8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.7 7.7 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a7.8 7.8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.8 7.8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>数据源</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <aside class="side-panel" aria-label="搜索和筛选">
+      <section class="welcome-card">
+        <div class="welcome-copy">
+          <p class="eyebrow">HELLO, SWEET DAY</p>
+          <h1>今天想吃点<br /><em>什么甜？</em></h1>
+          <p class="welcome-sub">松松把 16 座城市的 52 家甜品店，都轻轻放进地图里啦。</p>
+          <div class="welcome-tags"><span>🍮 治愈系小店</span><span>🗺️ 点地图逛逛</span></div>
+        </div>
+        <div class="welcome-art" aria-hidden="true">
+          <img src="assets/bear-lie.png" alt="" class="lying-bear" />
+        </div>
+      </section>
+
+      <div class="search-wrap">
+        <label class="search-box" for="searchInput">
+          <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <input id="searchInput" type="text" placeholder="搜店名、城市或甜品，比如「可颂」" autocomplete="off" spellcheck="false" aria-label="搜索甜品店" />
+          <button class="search-clear" id="searchClear" type="button" aria-label="清空搜索" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          </button>
+          <kbd class="search-kbd">/</kbd>
+        </label>
+        <div class="suggestions" id="suggestions" role="listbox" aria-label="搜索建议" hidden></div>
+      </div>
+
+      <section class="filters" aria-label="筛选条件">
+        <div class="filter-row">
+          <span class="filter-label">地区</span>
+          <div class="chip-row" id="regionChips"></div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">评分</span>
+          <div class="chip-row" id="ratingChips">
+            <button class="chip" data-rating="0" type="button">不限</button>
+            <button class="chip" data-rating="4.3" type="button">4.3+</button>
+            <button class="chip" data-rating="4.5" type="button">4.5+</button>
+            <button class="chip" data-rating="4.6" type="button">4.6+</button>
+          </div>
+        </div>
+        <div class="filter-row category-row">
+          <span class="filter-label">想吃</span>
+          <div class="chip-row chip-scroll" id="categoryChips"></div>
+        </div>
+      </section>
+
+      <div class="results-head">
+        <div>
+          <h2 id="resultsTitle">甜甜的店</h2>
+          <p class="results-sub" id="resultsSub">小熊正在翻它的甜品小本本…</p>
+        </div>
+        <div class="sort-wrap">
+          <label class="sr-only" for="sortSelect">排序方式</label>
+          <select id="sortSelect" class="sort-select">
+            <option value="rating">评分最高</option>
+            <option value="popular">最多人喜欢</option>
+            <option value="name">名字排排坐</option>
+          </select>
+          <svg viewBox="0 0 24 24" class="sort-chevron" aria-hidden="true"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+
+      <div class="results" id="results"></div>
+
+      <footer class="side-note">
+        <img src="assets/chick.png" alt="" class="note-bear" />
+        <p>精选评分参考公开评价整理，仅作灵感参考。连接 Google Places 后，可获取店铺实时评分与评论。<button class="text-link" id="noteSettings" type="button">去连接 →</button></p>
+      </footer>
+    </aside>
+
+    <section class="map-shell" aria-label="世界甜品地图">
+      <div id="map"></div>
+
+      <div class="map-tip" id="mapTip">
+        <img src="assets/brown-face.png" alt="" class="map-tip-bear" />
+        拖动、缩放地图，点小熊爪印去逛逛
+      </div>
+
+      <div class="city-banner" id="cityBanner" hidden>
+        <div class="city-banner-face" aria-hidden="true">
+          <img src="assets/brown-face.png" alt="" />
+        </div>
+        <div class="city-banner-copy">
+          <p class="city-kicker">正在逛 · WANDERING</p>
+          <h3><span id="cityBannerName">东京</span> <small id="cityBannerEn">Tokyo</small></h3>
+          <p id="cityBannerSub">4 家甜甜的店 · 甜点也要一丝不苟</p>
+        </div>
+        <div class="city-banner-actions">
+          <button class="google-fetch-btn" id="googleFetchBtn" type="button" title="从 Google Places 获取实时店铺与评分">
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m18.5 15 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" fill="currentColor"/></svg>
+            <span id="googleFetchLabel">Google 实时评分</span>
+          </button>
+          <button class="city-close" id="exitCityBtn" type="button" aria-label="回到世界地图">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="random-btn" id="randomBtn" type="button" title="随机去一家甜品店">
+        <span class="random-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M20 7h-3.5c-4.5 0-4.5 10-9 10H4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m17 4 3 3-3 3M17 14l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>随缘吃甜</span>
+      </button>
+
+      <div class="map-sticker" aria-hidden="true">
+        <div class="sticker-bear">
+          <img src="assets/white-bear.png" alt="" />
+        </div>
+        <div class="sticker-copy"><strong>慢慢逛，不着急</strong><span>地图上的小熊会带路</span></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 店铺详情 -->
+  <div class="modal-layer" id="shopModal" aria-hidden="true">
+    <div class="modal-scrim" data-close="shopModal"></div>
+    <div class="modal-card shop-modal-card" role="dialog" aria-modal="true" aria-labelledby="shopModalTitle">
+      <button class="modal-close" data-close="shopModal" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+      </button>
+      <div id="shopModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 数据源设置 -->
+  <div class="modal-layer" id="settingsModal" aria-hidden="true">
+    <div class="modal-scrim" data-close="settingsModal"></div>
+    <div class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <button class="modal-close" data-close="settingsModal" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+      </button>
+      <div class="settings-head">
+        <div class="settings-mascot" aria-hidden="true">
+          <img src="assets/white-face.png" alt="" />
+        </div>
+        <div>
+          <p class="eyebrow">SWEET DATA</p>
+          <h2 id="settingsTitle">让评分更新鲜一点</h2>
+        </div>
+      </div>
+      <div class="settings-body">
+        <p class="settings-intro">现在网站使用的是内置精选数据。填入 Google Maps API Key，就能在每座城市里获取 <strong>Google Places 的实时店铺、评分和评论</strong>。</p>
+        <ol class="settings-steps">
+          <li><span>1</span>到 Google Cloud Console 启用 <strong>Places API (New)</strong></li>
+          <li><span>2</span>创建 API Key，建议限制只允许本网站来源</li>
+          <li><span>3</span>把 Key 粘贴到这里，保存在你的浏览器本地</li>
+        </ol>
+        <label class="field-label" for="googleKeyInput">Google Maps API Key</label>
+        <div class="key-field">
+          <input id="googleKeyInput" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+          <button class="key-eye" id="keyEye" type="button" aria-label="显示或隐藏 API Key">显示</button>
+        </div>
+        <div class="settings-actions">
+          <button class="primary-btn" id="saveKeyBtn" type="button">保存 Key</button>
+          <button class="ghost-btn" id="testKeyBtn" type="button">测试连接</button>
+          <button class="text-danger" id="clearKeyBtn" type="button">移除</button>
+        </div>
+        <div class="key-status" id="keyStatus" hidden></div>
+        <p class="privacy-note">🔒 Key 只保存在本机浏览器（localStorage），请求直接发往 Google，不会经过任何第三方服务器。想深入了解可查看 <a href="https://developers.google.com/maps/documentation/places/web-service/text-search" target="_blank" rel="noopener noreferrer">Places API 文档</a>。</p>
+        <p class="privacy-note">没有 Key 也完全不影响逛地图。每家店的详情卡片里都有「在 Google Maps 查看」的链接，能看到最新的公开评分。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
