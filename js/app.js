@@ -59,6 +59,8 @@ const state = {
   favorites: readFavorites(),
   googleKey: store.get('sweetbear.googleKey') || '',
   liveShops: {},           // cityId -> google shops
+  addMode: false,
+  pendingLocation: null,   // { lat, lng, cityId }
 };
 
 let shopList = [...curatedShops];
@@ -107,6 +109,21 @@ const el = {
   googleFetchLabel: document.getElementById('googleFetchLabel'),
   exitCityBtn: document.getElementById('exitCityBtn'),
   randomBtn: document.getElementById('randomBtn'),
+  mapFavBtn: document.getElementById('mapFavBtn'),
+  mapFavCount: document.getElementById('mapFavCount'),
+  addShopBtn: document.getElementById('addShopBtn'),
+  addHint: document.getElementById('addHint'),
+  cancelAddBtn: document.getElementById('cancelAddBtn'),
+  addShopModal: document.getElementById('addShopModal'),
+  addShopForm: document.getElementById('addShopForm'),
+  addShopLoc: document.getElementById('addShopLoc'),
+  myShopName: document.getElementById('myShopName'),
+  myShopCategory: document.getElementById('myShopCategory'),
+  myShopRating: document.getElementById('myShopRating'),
+  myShopSignature: document.getElementById('myShopSignature'),
+  myShopAddress: document.getElementById('myShopAddress'),
+  myShopCollect: document.getElementById('myShopCollect'),
+  addShopError: document.getElementById('addShopError'),
   shopModal: document.getElementById('shopModal'),
   shopModalBody: document.getElementById('shopModalBody'),
   settingsModal: document.getElementById('settingsModal'),
@@ -235,6 +252,67 @@ function avatarSVG(kind) {
 
 const HEART_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4s-7.5-4.6-9.3-9A5.2 5.2 0 0 1 12 6.3a5.2 5.2 0 0 1 9.3 5.1c-1.8 4.4-9.3 9-9.3 9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 
+const PAW_HEART_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.4" cy="8.4" r="1.65" fill="currentColor"/><circle cx="10.1" cy="5.9" r="1.65" fill="currentColor"/><circle cx="13.9" cy="5.9" r="1.65" fill="currentColor"/><circle cx="17.6" cy="8.4" r="1.65" fill="currentColor"/><path d="M12 20.6c-3.1-2.2-4.9-4.1-4.9-6.3 0-1.5 1.1-2.7 2.6-2.7.9 0 1.7.5 2.3 1.4.6-.9 1.4-1.4 2.3-1.4 1.5 0 2.6 1.2 2.6 2.7 0 2.2-1.8 4.1-4.9 6.3Z" fill="currentColor"/></svg>`;
+
+/* ----------------------------- 我添加的小店 ----------------------------- */
+
+const MY_SHOPS_KEY = 'sweetbear.myShops';
+
+function readMyShopsRaw() {
+  try {
+    const parsed = JSON.parse(store.get(MY_SHOPS_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((shop) => (
+      shop
+      && typeof shop.name === 'string'
+      && typeof shop.lat === 'number'
+      && typeof shop.lng === 'number'
+      && cityIndex[shop.city]
+    ));
+  } catch (err) {
+    return [];
+  }
+}
+
+function decorateMyShop(shop) {
+  const merged = {
+    nameEn: '',
+    rating: 0,
+    reviewCount: 0,
+    signature: '',
+    address: '',
+    hours: '',
+    price: '',
+    ...shop,
+    tags: Array.isArray(shop.tags) && shop.tags.length ? shop.tags : ['我的小店'],
+    notes: Array.isArray(shop.notes) ? shop.notes : [],
+    category: categoryIndex[shop.category] ? shop.category : 'cake',
+    rating: Number.isFinite(shop.rating) ? shop.rating : 0,
+    source: 'custom',
+  };
+  return decorateShop(merged);
+}
+
+function persistMyShops(list) {
+  store.set(MY_SHOPS_KEY, JSON.stringify(list));
+}
+
+function addMyShop(shop) {
+  const list = readMyShopsRaw();
+  list.push(shop);
+  persistMyShops(list);
+  rebuildSearchIndex();
+  if (map) buildCityMarkers();
+}
+
+function removeMyShop(shopId) {
+  persistMyShops(readMyShopsRaw().filter((shop) => shop.id !== shopId));
+  state.favorites.delete(shopId);
+  persistFavorites();
+  rebuildSearchIndex();
+  if (map) buildCityMarkers();
+}
+
 /* ----------------------------- 工具函数 ----------------------------- */
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -316,7 +394,8 @@ function isCuratedTwin(shop) {
 }
 
 function rebuildSearchIndex() {
-  shopList = [...curatedShops, ...allLiveShops()];
+  const myShops = readMyShopsRaw().map(decorateMyShop);
+  shopList = [...curatedShops, ...myShops, ...allLiveShops()];
   shopsById = new Map(shopList.map((shop) => [shop.id, shop]));
 
   if (typeof Fuse === 'undefined') {
@@ -423,17 +502,19 @@ function getResults() {
 
 function cardHTML(shop) {
   const isFav = state.favorites.has(shop.id);
+  const isMine = shop.source === 'custom';
   const city = cityIndex[shop.city] || {};
   const price = priceText(shop.price);
   const liveBadge = shop.source === 'google' ? `<span class="source-badge">LIVE</span>` : '';
+  const mineBadge = isMine ? `<span class="my-shop-chip">${PAW_HEART_SVG}我的小店</span>` : '';
 
   return `
-    <article class="shop-card cat-${esc(shop.category)}" data-shop="${esc(shop.id)}" tabindex="0" role="button" aria-label="查看 ${esc(shop.name)} 的详情">
+    <article class="shop-card cat-${esc(shop.category)} ${isMine ? 'is-mine' : ''}" data-shop="${esc(shop.id)}" tabindex="0" role="button" aria-label="查看 ${esc(shop.name)} 的详情">
       <div class="shop-thumb" aria-hidden="true">${dessertArt(shop.category)}</div>
       <div class="shop-card-body">
         <div class="shop-name-row">
           <h3 class="shop-name">${esc(shop.name)}</h3>
-          ${liveBadge}
+          ${liveBadge}${mineBadge}
         </div>
         <p class="shop-meta">
           <span>${esc(city.name || shop.cityName)}</span><i class="dot"></i>
@@ -564,7 +645,21 @@ function syncFavoritesUI() {
   el.favCount.textContent = String(state.favorites.size);
   el.favoritesToggle.classList.toggle('is-active', state.favoritesOnly);
   el.favoritesToggle.setAttribute('aria-pressed', String(state.favoritesOnly));
+  if (el.mapFavCount) el.mapFavCount.textContent = String(state.favorites.size);
+  if (el.mapFavBtn) {
+    el.mapFavBtn.classList.toggle('is-active', state.favoritesOnly);
+    el.mapFavBtn.setAttribute('aria-pressed', String(state.favoritesOnly));
+  }
   el.liveDot.hidden = !state.googleKey;
+}
+
+function setFavoritesOnly(value) {
+  state.favoritesOnly = value;
+  syncFavoritesUI();
+  renderResults();
+  if (value) {
+    showToast(state.favorites.size ? '只给你看收藏的小甜甜 ♡' : '收藏夹还空着，先点心心吧。');
+  }
 }
 
 /* ----------------------------- 收藏 ----------------------------- */
@@ -604,9 +699,175 @@ function toggleFavorite(shopId) {
     }
   });
 
+  const marker = shopMarkers.get(shopId);
+  const shop = shopsById.get(shopId);
+  if (marker && shop) marker.setIcon(shopPinIcon(shop));
+
   if (state.favoritesOnly) {
     renderResults();
   }
+}
+
+/* ----------------------------- 加店流程 ----------------------------- */
+
+function fillMyShopCategories() {
+  if (!el.myShopCategory) return;
+  el.myShopCategory.innerHTML = CATEGORIES
+    .filter((category) => category.id !== 'all')
+    .map((category) => `<option value="${esc(category.id)}">${esc(category.emoji)} ${esc(category.label)}</option>`)
+    .join('');
+}
+
+function distanceKm(a, b) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function nearestCity(latlng) {
+  let best = CITIES[0];
+  let bestDistance = Infinity;
+  CITIES.forEach((city) => {
+    const distance = distanceKm(
+      { lat: latlng.lat, lng: latlng.lng },
+      { lat: city.lat, lng: city.lng },
+    );
+    if (distance < bestDistance) {
+      best = city;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function setAddMode(on) {
+  state.addMode = Boolean(on);
+  const shell = document.querySelector('.map-shell');
+  if (shell) shell.classList.toggle('is-adding', state.addMode);
+  if (el.addHint) el.addHint.hidden = !state.addMode;
+  if (el.addShopBtn) {
+    el.addShopBtn.classList.toggle('is-active', state.addMode);
+    const text = el.addShopBtn.querySelector('.add-fab-text');
+    if (text) text.textContent = state.addMode ? '取消' : '加店';
+    el.addShopBtn.title = state.addMode ? '退出加店模式' : '在地图上添加我的小店';
+  }
+  if (state.addMode) {
+    if (map) map.closePopup();
+    if (map) map.closeTooltip();
+    showToast('在地图上点一下，把小店放在那里 📍', 'info', 2600);
+  } else {
+    state.pendingLocation = null;
+  }
+}
+
+function showAddShopError(message) {
+  if (!el.addShopError) return;
+  el.addShopError.textContent = message;
+  el.addShopError.hidden = false;
+}
+
+function beginAddAt(latlng) {
+  if (!latlng) return;
+  const city = nearestCity(latlng);
+  state.pendingLocation = { lat: latlng.lat, lng: latlng.lng, cityId: city.id };
+
+  if (el.addShopLoc) el.addShopLoc.textContent = `已选好位置 · 靠近 ${city.name}`;
+  if (el.addShopForm) el.addShopForm.reset();
+  if (el.myShopCategory) el.myShopCategory.value = 'cake';
+  if (el.myShopCollect) el.myShopCollect.checked = true;
+  if (el.addShopError) el.addShopError.hidden = true;
+
+  openModal(el.addShopModal);
+  setTimeout(() => { if (el.myShopName) el.myShopName.focus(); }, 120);
+}
+
+function handleAddShopSubmit(event) {
+  event.preventDefault();
+  const name = (el.myShopName?.value || '').trim();
+  if (!name) {
+    showAddShopError('先给小店起个名字吧。');
+    el.myShopName?.focus();
+    return;
+  }
+  if (!state.pendingLocation) {
+    showAddShopError('还没有选好位置，点一下地图再试。');
+    return;
+  }
+
+  const rawRating = Number(el.myShopRating?.value);
+  const rating = Number.isFinite(rawRating) ? Math.min(5, Math.max(0, Math.round(rawRating * 10) / 10)) : 0;
+  const shop = {
+    id: `my-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    city: state.pendingLocation.cityId,
+    category: categoryIndex[el.myShopCategory?.value] ? el.myShopCategory.value : 'cake',
+    rating,
+    reviewCount: 0,
+    signature: (el.myShopSignature?.value || '').trim(),
+    address: (el.myShopAddress?.value || '').trim(),
+    hours: '',
+    price: '',
+    tags: ['我的小店'],
+    notes: [],
+    lat: state.pendingLocation.lat,
+    lng: state.pendingLocation.lng,
+    source: 'custom',
+    createdAt: new Date().toISOString(),
+  };
+
+  addMyShop(shop);
+
+  if (el.myShopCollect?.checked) {
+    state.favorites.add(shop.id);
+    persistFavorites();
+    syncFavoritesUI();
+  }
+
+  closeModal(el.addShopModal);
+  if (el.addShopForm) el.addShopForm.reset();
+
+  selectCity(shop.city);
+  renderResults();
+  updateCityBanner();
+
+  const created = shopsById.get(shop.id);
+  if (created) setTimeout(() => focusShop(created), 220);
+  showToast(`「${shop.name}」已经放进地图啦 ♡`, 'info', 2400);
+}
+
+let pendingDeleteShopId = null;
+let deleteConfirmTimer = null;
+
+function handleDeleteMyShop(button) {
+  const shopId = button.dataset.deleteMyShop;
+  if (!shopId) return;
+
+  if (pendingDeleteShopId !== shopId) {
+    pendingDeleteShopId = shopId;
+    button.classList.add('is-confirming');
+    button.textContent = '再点一次，确认删除';
+    clearTimeout(deleteConfirmTimer);
+    deleteConfirmTimer = setTimeout(() => {
+      pendingDeleteShopId = null;
+      button.classList.remove('is-confirming');
+      button.textContent = '删除我的小店';
+    }, 3000);
+    return;
+  }
+
+  clearTimeout(deleteConfirmTimer);
+  pendingDeleteShopId = null;
+  removeMyShop(shopId);
+  closeModal(el.shopModal);
+  renderResults();
+  updateCityBanner();
+  refreshMapShops();
+  syncFavoritesUI();
+  showToast('这家小店已经从地图上拿走啦。', 'info', 2000);
 }
 
 /* ----------------------------- 地图 ----------------------------- */
@@ -729,7 +990,10 @@ function initMap() {
     window.addEventListener('resize', keepWorldInView);
   }
 
-  map.on('click', () => hideSuggestions());
+  map.on('click', (event) => {
+    hideSuggestions();
+    if (state.addMode && event.latlng) beginAddAt(event.latlng);
+  });
 }
 
 function buildCityMarkers() {
@@ -780,11 +1044,13 @@ function syncActiveCityPin() {
 
 function shopPinIcon(shop) {
   const favClass = state.favorites.has(shop.id) ? 'is-fav' : '';
+  const mineClass = shop.source === 'custom' ? 'is-mine' : '';
   return L.divIcon({
     className: 'shop-pin-wrap',
-    html: `<div class="shop-pin cat-${esc(shop.category)} ${favClass}">
+    html: `<div class="shop-pin cat-${esc(shop.category)} ${favClass} ${mineClass}">
       <div class="shop-pin-bubble">${dessertArt(shop.category)}</div>
       <div class="shop-pin-tail"></div>
+      ${mineClass ? `<span class="pin-mine-badge" aria-hidden="true">${PAW_HEART_SVG}</span>` : ''}
     </div>`,
     iconSize: [44, 52],
     iconAnchor: [22, 52],
@@ -796,13 +1062,14 @@ function popupHTML(shop) {
   const city = cityIndex[shop.city] || {};
   const isFav = state.favorites.has(shop.id);
   const liveBadge = shop.source === 'google' ? ' · 实时' : '';
+  const mineBadge = shop.source === 'custom' ? ' · 我的小店' : '';
   return `
     <div class="popup-card cat-${esc(shop.category)}">
       <div class="popup-top">
         <div class="popup-art" aria-hidden="true">${dessertArt(shop.category)}</div>
         <div>
           <h3 class="popup-name">${esc(shop.name)}</h3>
-          <p class="popup-meta">${esc(city.name || shop.cityName)} · ${esc(shop.categoryLabel)}${liveBadge}</p>
+          <p class="popup-meta">${esc(city.name || shop.cityName)} · ${esc(shop.categoryLabel)}${liveBadge}${mineBadge}</p>
         </div>
       </div>
       <div class="popup-rating">
@@ -833,7 +1100,7 @@ function refreshMapShops() {
       icon: shopPinIcon(shop),
       title: shop.name,
       riseOnHover: true,
-      zIndexOffset: 500,
+      zIndexOffset: shop.source === 'custom' ? 900 : 500,
     });
 
     marker.bindPopup(popupHTML(shop), {
@@ -1094,6 +1361,7 @@ function handleSearchInput() {
 
 function openModal(modalEl) {
   if (!modalEl) return;
+  if (modalEl !== el.addShopModal && state.addMode) setAddMode(false);
   lastFocusedElement = document.activeElement;
   modalEl.classList.add('is-open');
   modalEl.setAttribute('aria-hidden', 'false');
@@ -1107,6 +1375,7 @@ function closeModal(modalEl) {
   modalEl.classList.remove('is-open');
   modalEl.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('modal-open');
+  if (modalEl === el.addShopModal) setAddMode(false);
   if (currentModalShopId && modalEl === el.shopModal) currentModalShopId = null;
   if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
     lastFocusedElement.focus({ preventScroll: true });
@@ -1132,6 +1401,7 @@ function openShopModal(shop) {
   const city = cityIndex[shop.city] || {};
   const isFav = state.favorites.has(shop.id);
   const live = shop.source === 'google';
+  const mine = shop.source === 'custom';
   const price = priceText(shop.price);
   const tags = (shop.tags || []).filter(Boolean).slice(0, 5);
   const notes = (shop.notes || []).filter(Boolean).slice(0, 3);
@@ -1145,6 +1415,7 @@ function openShopModal(shop) {
         <span class="hero-chip">${esc(shop.categoryEmoji || '🍰')} ${esc(shop.categoryLabel)}</span>
         ${price ? `<span class="hero-chip">${esc(price)}</span>` : ''}
         ${live ? '<span class="hero-chip">Google 实时</span>' : ''}
+        ${mine ? `<span class="hero-chip my-hero-chip">${PAW_HEART_SVG}我的小店</span>` : ''}
       </p>
       <div class="shop-hero-rating">
         ${starsHTML(shop.rating)}
@@ -1182,10 +1453,13 @@ function openShopModal(shop) {
         <button class="ghost-btn ${isFav ? 'is-fav' : ''}" type="button" data-toggle-fav="${esc(shop.id)}" aria-pressed="${isFav}">
           ${HEART_SVG} <span>${isFav ? '已收藏' : '收藏小店'}</span>
         </button>
+        ${mine ? `<button class="ghost-btn my-shop-delete" type="button" data-delete-my-shop="${esc(shop.id)}">删除我的小店</button>` : ''}
       </div>
-      <p class="shop-source-line">${live
-        ? '店铺、评分与评论来自 Google Places，实时获取，可能会继续更新。'
-        : '店铺与评分为精选整理，仅作灵感参考；营业时间可能变动，出发前建议在 Google Maps 确认。'}</p>
+      <p class="shop-source-line">${mine
+        ? '这是你自己放进地图的小店，收藏信息只保存在当前浏览器里。'
+        : live
+          ? '店铺、评分与评论来自 Google Places，实时获取，可能会继续更新。'
+          : '店铺与评分为精选整理，仅作灵感参考；营业时间可能变动，出发前建议在 Google Maps 确认。'}</p>
     </div>`;
 
   openModal(el.shopModal);
@@ -1503,6 +1777,7 @@ function bindEvents() {
     if (event.key === 'Escape') {
       const openLayer = document.querySelector('.modal-layer.is-open');
       if (openLayer) closeModal(openLayer);
+      else if (state.addMode) setAddMode(false);
       else hideSuggestions();
     }
   });
@@ -1539,13 +1814,32 @@ function bindEvents() {
 
   /* 收藏 */
   el.favoritesToggle.addEventListener('click', () => {
-    state.favoritesOnly = !state.favoritesOnly;
-    syncFavoritesUI();
-    renderResults();
-    if (state.favoritesOnly) {
-      showToast(state.favorites.size ? '只给你看收藏的小甜甜 ♡' : '收藏夹还空着，先点心心吧。');
-    }
+    setFavoritesOnly(!state.favoritesOnly);
   });
+
+  if (el.mapFavBtn) {
+    el.mapFavBtn.addEventListener('click', () => {
+      setFavoritesOnly(!state.favoritesOnly);
+      if (state.favoritesOnly && state.activeCity) {
+        const first = getResults()[0];
+        if (first) setTimeout(() => focusShop(first), 120);
+      }
+    });
+  }
+
+  /* 加店 */
+  if (el.addShopBtn) {
+    el.addShopBtn.addEventListener('click', () => setAddMode(!state.addMode));
+  }
+  if (el.cancelAddBtn) {
+    el.cancelAddBtn.addEventListener('click', () => setAddMode(false));
+  }
+  if (el.addShopForm) {
+    el.addShopForm.addEventListener('submit', handleAddShopSubmit);
+    el.addShopForm.addEventListener('input', () => {
+      if (el.addShopError) el.addShopError.hidden = true;
+    });
+  }
 
   /* 结果列表 */
   el.results.addEventListener('click', (event) => {
@@ -1604,6 +1898,12 @@ function bindEvents() {
     const favTrigger = event.target.closest('[data-toggle-fav]');
     if (favTrigger) {
       toggleFavorite(favTrigger.dataset.toggleFav);
+      return;
+    }
+
+    const deleteTrigger = event.target.closest('[data-delete-my-shop]');
+    if (deleteTrigger) {
+      handleDeleteMyShop(deleteTrigger);
       return;
     }
 
@@ -1670,6 +1970,7 @@ function goRandom() {
 
 function init() {
   rebuildSearchIndex();
+  fillMyShopCategories();
   buildFilterChips();
   syncFilterUI();
   syncFavoritesUI();

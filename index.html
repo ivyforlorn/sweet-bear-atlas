@@ -148,6 +148,29 @@
         <span>随缘吃甜</span>
       </button>
 
+      <div class="map-fab-stack">
+        <button class="map-fab fav-fab" id="mapFavBtn" type="button" title="只看我收藏的小店" aria-pressed="false">
+          <span class="fav-fab-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="6.4" cy="8.4" r="1.65" fill="currentColor"/><circle cx="10.1" cy="5.9" r="1.65" fill="currentColor"/><circle cx="13.9" cy="5.9" r="1.65" fill="currentColor"/><circle cx="17.6" cy="8.4" r="1.65" fill="currentColor"/><path d="M12 20.6c-3.1-2.2-4.9-4.1-4.9-6.3 0-1.5 1.1-2.7 2.6-2.7.9 0 1.7.5 2.3 1.4.6-.9 1.4-1.4 2.3-1.4 1.5 0 2.6 1.2 2.6 2.7 0 2.2-1.8 4.1-4.9 6.3Z" fill="currentColor"/></svg>
+          </span>
+          <span class="fav-fab-count" id="mapFavCount">0</span>
+        </button>
+        <button class="map-fab add-fab" id="addShopBtn" type="button" title="在地图上添加我的小店">
+          <span class="add-fab-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="add-fab-text">加店</span>
+        </button>
+      </div>
+
+      <div class="add-hint" id="addHint" hidden>
+        <span class="add-hint-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="6.4" cy="8.4" r="1.65" fill="currentColor"/><circle cx="10.1" cy="5.9" r="1.65" fill="currentColor"/><circle cx="13.9" cy="5.9" r="1.65" fill="currentColor"/><circle cx="17.6" cy="8.4" r="1.65" fill="currentColor"/><path d="M12 20.6c-3.1-2.2-4.9-4.1-4.9-6.3 0-1.5 1.1-2.7 2.6-2.7.9 0 1.7.5 2.3 1.4.6-.9 1.4-1.4 2.3-1.4 1.5 0 2.6 1.2 2.6 2.7 0 2.2-1.8 4.1-4.9 6.3Z" fill="currentColor"/></svg>
+        </span>
+        <span class="add-hint-text">点一下地图，把小店放在那里</span>
+        <button class="add-hint-cancel" id="cancelAddBtn" type="button">取消</button>
+      </div>
+
       <div class="map-sticker" aria-hidden="true">
         <div class="sticker-bear">
           <img src="assets/white-bear.png" alt="" />
@@ -165,6 +188,67 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
       </button>
       <div id="shopModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 添加我的小店 -->
+  <div class="modal-layer" id="addShopModal" aria-hidden="true">
+    <div class="modal-scrim" data-close="addShopModal"></div>
+    <div class="modal-card add-shop-card" role="dialog" aria-modal="true" aria-labelledby="addShopTitle">
+      <button class="modal-close" data-close="addShopModal" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+      </button>
+      <div class="add-shop-head">
+        <div class="add-shop-mascot" aria-hidden="true">
+          <img src="assets/brown-face.png" alt="" />
+        </div>
+        <div>
+          <p class="eyebrow">MY SWEET SPOT</p>
+          <h2 id="addShopTitle">把小店放进地图</h2>
+          <p class="add-shop-loc" id="addShopLoc">正在等你在图上选一个位置</p>
+        </div>
+      </div>
+      <form class="add-shop-form" id="addShopForm" novalidate>
+        <label class="field-label" for="myShopName">店名 <span class="field-req">必填</span></label>
+        <input class="text-field" id="myShopName" type="text" maxlength="40" placeholder="比如：街角的草莓蛋糕店" autocomplete="off" required />
+
+        <div class="add-shop-grid">
+          <div>
+            <label class="field-label" for="myShopCategory">品类</label>
+            <div class="select-wrap">
+              <select class="text-field" id="myShopCategory"></select>
+              <svg class="select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="myShopRating">评分（可选）</label>
+            <input class="text-field" id="myShopRating" type="number" min="0" max="5" step="0.1" inputmode="decimal" placeholder="4.5" />
+          </div>
+        </div>
+
+        <label class="field-label" for="myShopSignature">招牌甜点（可选）</label>
+        <input class="text-field" id="myShopSignature" type="text" maxlength="60" placeholder="最想推荐的那一口" autocomplete="off" />
+
+        <label class="field-label" for="myShopAddress">地址 / 小备注（可选）</label>
+        <input class="text-field" id="myShopAddress" type="text" maxlength="80" placeholder="比如：二楼靠窗的位置" autocomplete="off" />
+
+        <label class="collect-toggle">
+          <input id="myShopCollect" type="checkbox" checked />
+          <span class="collect-box" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="6.4" cy="8.4" r="1.65" fill="currentColor"/><circle cx="10.1" cy="5.9" r="1.65" fill="currentColor"/><circle cx="13.9" cy="5.9" r="1.65" fill="currentColor"/><circle cx="17.6" cy="8.4" r="1.65" fill="currentColor"/><path d="M12 20.6c-3.1-2.2-4.9-4.1-4.9-6.3 0-1.5 1.1-2.7 2.6-2.7.9 0 1.7.5 2.3 1.4.6-.9 1.4-1.4 2.3-1.4 1.5 0 2.6 1.2 2.6 2.7 0 2.2-1.8 4.1-4.9 6.3Z" fill="currentColor"/></svg>
+          </span>
+          <span class="collect-copy">
+            <strong>收藏这家小店</strong>
+            <small>保存后会出现在「我的收藏」里</small>
+          </span>
+        </label>
+
+        <p class="add-shop-error" id="addShopError" hidden></p>
+        <div class="add-shop-actions">
+          <button class="primary-btn" type="submit">放进地图</button>
+          <button class="ghost-btn" type="button" data-close="addShopModal">再想想</button>
+        </div>
+      </form>
     </div>
   </div>
 
